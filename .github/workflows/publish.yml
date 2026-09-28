@@ -1,0 +1,42 @@
+name: Publish APK
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: Temporary URL of the APK
+        required: true
+permissions:
+  contents: write
+  pages: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch and verify APK
+        env:
+          APK_URL: ${{ inputs.apk_url }}
+        run: |
+          curl -fsSL "$APK_URL" -o GorillaLocomotion.apk
+          ls -l GorillaLocomotion.apk
+          echo "df8208a263bafea7f4a2728ea15b2d9dd2a5909d8b24fce69a026b9add0b1e61  GorillaLocomotion.apk" | sha256sum -c -
+      - name: Push gh-pages branch
+        run: |
+          mkdir out && cp index.html GorillaLocomotion.apk out/ && touch out/.nojekyll
+          cd out
+          git init -b gh-pages
+          git config user.name "x-alted1"
+          git config user.email "x-alted1@users.noreply.github.com"
+          git add -A && git commit -m "Publish Gorilla Forest download page"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" gh-pages
+      - name: Create release with APK asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v1 GorillaLocomotion.apk --repo "${{ github.repository }}" --title "Gorilla Forest v1" --notes "Quest APK" || gh release upload v1 GorillaLocomotion.apk --clobber --repo "${{ github.repository }}"
+      - name: Try enabling Pages (gh-pages branch)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X POST "repos/${{ github.repository }}/pages" -f "source[branch]=gh-pages" -f "source[path]=/" || gh api "repos/${{ github.repository }}/pages"
